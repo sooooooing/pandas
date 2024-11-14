@@ -1642,23 +1642,18 @@ class EABackedBlock(Block):
             values = values.T
         check_setitem_lengths(indexer, value, values)
 
+        if values[indexer].shape != np.array(value).shape:
+            raise ValueError("Shape mismatch: cannot broadcast value to the indexing target.")
+    
         try:
             values[indexer] = value
-        except (ValueError, TypeError):
-            if isinstance(self.dtype, IntervalDtype):
-                # see TestSetitemFloatIntervalWithIntIntervalValues
-                nb = self.coerce_to_target_dtype(orig_value, raise_on_upcast=True)
-                return nb.setitem(orig_indexer, orig_value)
-
-            elif isinstance(self, NDArrayBackedExtensionBlock):
-                nb = self.coerce_to_target_dtype(orig_value, raise_on_upcast=True)
-                return nb.setitem(orig_indexer, orig_value)
-
-            else:
-                raise
-
-        else:
-            return self
+        except (TypeError, ValueError) as err:
+            if is_list_like(value):
+                raise ValueError(
+                    "setting an array element with a sequence."
+                ) from err
+            raise
+        return self
 
     @final
     def where(self, other, cond) -> list[Block]:
